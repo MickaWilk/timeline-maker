@@ -1,44 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { TimelineEvent, CATEGORY_LABELS, CATEGORY_COLORS, Category } from '@/types'
+import { useRouter } from 'next/navigation'
+import { TimelineEvent, TimelineEventInsert, CATEGORY_LABELS, CATEGORY_COLORS, Category } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EventDialog } from './event-dialog'
+import { createClient } from '@/lib/supabase/client'
 
-// Placeholder data for V0 dev — will be replaced by Supabase queries
-const MOCK_EVENTS: TimelineEvent[] = [
-  {
-    id: '1',
-    user_id: 'mock',
-    date: '2026-06-15',
-    title: 'Début chez Onepoint',
-    description: 'Prise de poste Associate Data Intelligence',
-    category: 'pro',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    user_id: 'mock',
-    date: '2024-04-01',
-    title: 'CDI chez Groupe Pichet',
-    description: 'Passage de l\'alternance au CDI — Data Scientist / Ingénieur IA',
-    category: 'pro',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    user_id: 'mock',
-    date: '2022-12-01',
-    title: 'Début alternance Simplon × Pichet',
-    description: null,
-    category: 'formation',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
+interface TimelinePageProps {
+  initialEvents: TimelineEvent[]
+  userId: string
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('fr-FR', {
@@ -48,10 +21,9 @@ function formatDate(dateStr: string): string {
   })
 }
 
-export function TimelinePage() {
-  const [events, setEvents] = useState<TimelineEvent[]>(
-    [...MOCK_EVENTS].sort((a, b) => b.date.localeCompare(a.date))
-  )
+export function TimelinePage({ initialEvents, userId }: TimelinePageProps) {
+  const router = useRouter()
+  const [events] = useState<TimelineEvent[]>(initialEvents)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null)
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all')
@@ -60,27 +32,28 @@ export function TimelinePage() {
     ? events
     : events.filter(e => e.category === activeCategory)
 
-  function handleSave(data: Omit<TimelineEvent, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  async function handleSave(data: TimelineEventInsert) {
+    const supabase = createClient()
     if (editingEvent) {
-      setEvents(prev => prev.map(e =>
-        e.id === editingEvent.id ? { ...e, ...data, updated_at: new Date().toISOString() } : e
-      ).sort((a, b) => b.date.localeCompare(a.date)))
+      await supabase.from('timeline_events').update(data).eq('id', editingEvent.id)
     } else {
-      const newEvent: TimelineEvent = {
-        id: crypto.randomUUID(),
-        user_id: 'mock',
-        ...data,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      setEvents(prev => [...prev, newEvent].sort((a, b) => b.date.localeCompare(a.date)))
+      await supabase.from('timeline_events').insert({ ...data, user_id: userId })
     }
     setDialogOpen(false)
     setEditingEvent(null)
+    router.refresh()
   }
 
-  function handleDelete(id: string) {
-    setEvents(prev => prev.filter(e => e.id !== id))
+  async function handleDelete(id: string) {
+    const supabase = createClient()
+    await supabase.from('timeline_events').delete().eq('id', id)
+    router.refresh()
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   return (
@@ -92,9 +65,17 @@ export function TimelinePage() {
             <h1 className="text-2xl font-semibold tracking-tight">Ma timeline</h1>
             <p className="text-zinc-400 text-sm mt-1">{events.length} événements</p>
           </div>
-          <Button onClick={() => { setEditingEvent(null); setDialogOpen(true) }}>
-            + Ajouter
-          </Button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              Déconnexion
+            </button>
+            <Button onClick={() => { setEditingEvent(null); setDialogOpen(true) }}>
+              + Ajouter
+            </Button>
+          </div>
         </div>
 
         {/* Category filter */}

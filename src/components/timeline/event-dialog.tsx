@@ -19,6 +19,11 @@ interface EventDialogProps {
   onSave: (data: Omit<TimelineEvent, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
 }
 
+interface Suggestion {
+  category: Category
+  sensitive: boolean
+}
+
 const DEFAULT_CATEGORY: Category = 'personnel'
 
 export function EventDialog({ open, onOpenChange, event, onSave }: EventDialogProps) {
@@ -26,6 +31,8 @@ export function EventDialog({ open, onOpenChange, event, onSave }: EventDialogPr
   const [date, setDate] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<Category>(DEFAULT_CATEGORY)
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false)
 
   useEffect(() => {
     if (event) {
@@ -39,7 +46,31 @@ export function EventDialog({ open, onOpenChange, event, onSave }: EventDialogPr
       setDescription('')
       setCategory(DEFAULT_CATEGORY)
     }
+    setSuggestion(null)
   }, [event, open])
+
+  useEffect(() => {
+    if (!title.trim()) {
+      setSuggestion(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setLoadingSuggestion(true)
+      try {
+        const res = await fetch('/api/suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.category) setSuggestion(data)
+        }
+      } catch {}
+      setLoadingSuggestion(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [title, description])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -78,7 +109,12 @@ export function EventDialog({ open, onOpenChange, event, onSave }: EventDialogPr
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1.5 block">Catégorie</label>
+            <label className="text-xs text-zinc-400 mb-1.5 flex items-center gap-1.5">
+              Catégorie
+              {loadingSuggestion && (
+                <span className="text-zinc-600 text-xs animate-pulse">...</span>
+              )}
+            </label>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(CATEGORY_LABELS) as Category[]).map(cat => (
                 <button
@@ -95,6 +131,20 @@ export function EventDialog({ open, onOpenChange, event, onSave }: EventDialogPr
                 </button>
               ))}
             </div>
+            {suggestion && (
+              <div className="mt-2 flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCategory(suggestion.category)}
+                  className="self-start text-xs px-3 py-1 rounded-full border border-zinc-600 bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition-colors"
+                >
+                  Suggestion : {CATEGORY_LABELS[suggestion.category]}
+                </button>
+                {suggestion.sensitive && (
+                  <span className="text-xs text-amber-400">⚠ Info potentiellement sensible</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

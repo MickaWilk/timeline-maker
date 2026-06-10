@@ -1,8 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'edge'
-
 export async function POST(request: NextRequest) {
   const { title, description } = await request.json()
 

@@ -30,9 +30,11 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte autour) :
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
+  // Haiku peut enrober le JSON en fences markdown - extraire le premier objet JSON
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
 
   try {
-    const result = JSON.parse(text)
+    const result = JSON.parse(jsonMatch ? jsonMatch[0] : text)
     return NextResponse.json(result)
   } catch {
     return NextResponse.json({ category: null, sensitive: false })

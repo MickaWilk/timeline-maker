@@ -23,7 +23,7 @@ function formatDate(dateStr: string): string {
 
 export function TimelinePage({ initialEvents, userId }: TimelinePageProps) {
   const router = useRouter()
-  const [events] = useState<TimelineEvent[]>(initialEvents)
+  const [events, setEvents] = useState<TimelineEvent[]>(initialEvents)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null)
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all')
@@ -32,11 +32,26 @@ export function TimelinePage({ initialEvents, userId }: TimelinePageProps) {
     ? events
     : events.filter(e => e.category === activeCategory)
 
+  function sortByDate(list: TimelineEvent[]) {
+    return [...list].sort((a, b) => b.date.localeCompare(a.date))
+  }
+
   async function handleSave(data: TimelineEventInsert) {
     const supabase = createClient()
     if (editingEvent) {
+      setEvents(prev => sortByDate(prev.map(e =>
+        e.id === editingEvent.id ? { ...e, ...data, updated_at: new Date().toISOString() } : e
+      )))
       await supabase.from('timeline_events').update(data).eq('id', editingEvent.id)
     } else {
+      const newEvent: TimelineEvent = {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        ...data,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      setEvents(prev => sortByDate([...prev, newEvent]))
       await supabase.from('timeline_events').insert({ ...data, user_id: userId })
     }
     setDialogOpen(false)
@@ -46,6 +61,7 @@ export function TimelinePage({ initialEvents, userId }: TimelinePageProps) {
 
   async function handleDelete(id: string) {
     const supabase = createClient()
+    setEvents(prev => prev.filter(e => e.id !== id))
     await supabase.from('timeline_events').delete().eq('id', id)
     router.refresh()
   }
@@ -63,19 +79,19 @@ export function TimelinePage({ initialEvents, userId }: TimelinePageProps) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Ma timeline</h1>
-            <p className="text-zinc-400 text-sm mt-1">{events.length} événements</p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-zinc-400 text-sm">{events.length} événements</p>
+              <button
+                onClick={handleSignOut}
+                className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+              >
+                Déconnexion
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSignOut}
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              Déconnexion
-            </button>
-            <Button onClick={() => { setEditingEvent(null); setDialogOpen(true) }}>
-              + Ajouter
-            </Button>
-          </div>
+          <Button onClick={() => { setEditingEvent(null); setDialogOpen(true) }}>
+            + Ajouter
+          </Button>
         </div>
 
         {/* Category filter */}

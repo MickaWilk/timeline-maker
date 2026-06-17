@@ -23,17 +23,16 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de texte autour) :
   "sensitive": <true si l'info est potentiellement sensible/intime/traumatique, false sinon>
 }`
 
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 100,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  // Haiku peut enrober le JSON en fences markdown - extraire le premier objet JSON
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-
   try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 100,
+      messages: [{ role: 'user', content: prompt }],
+    })
+
+    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    // Haiku peut enrober le JSON en fences markdown - extraire le premier objet JSON
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
     const result = JSON.parse(jsonMatch ? jsonMatch[0] : text)
     return NextResponse.json(result)
   } catch {

@@ -38,5 +38,9 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "^4.99.0"
+  },
+  "overrides": {
+    "strnum": "2.1.2",
+    "fast-xml-parser": "5.3.7"
   }
 }
